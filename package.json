@@ -11,7 +11,7 @@
     "env": "shopify app env",
     "start": "react-router-serve ./build/server/index.js",
     "docker-start": "npm run setup && npm run start",
-    "setup": "prisma generate",
+    "setup": "node scripts/setup-prisma.js",
     "setup:with-migrations": "prisma generate && prisma migrate deploy",
     "postinstall": "prisma generate",
     "vercel-build": "npm run setup && npm run build",
