@@ -1,6 +1,9 @@
 /**
  * Vercel serverless function handler for React Router app
  * This file handles all routes and delegates to React Router
+ * 
+ * @see https://vercel.com/docs/functions/serverless-functions/runtimes/node-js
+ * Config: maxDuration=30s, memory=1024MB
  */
 
 import { createRequestHandler } from "@react-router/node";
