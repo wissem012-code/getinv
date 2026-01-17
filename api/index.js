@@ -17,29 +17,70 @@ const handleRequest = createRequestHandler({
 export default async function handler(req, res) {
   try {
     // Enterprise-grade path handling for Vercel serverless functions
-    // Preserve original request path from rewrite using Vercel headers
+    // Debug logging to understand what Vercel is sending
+    console.log("[api/index] Request received:", {
+      url: req.url,
+      method: req.method,
+      headers: {
+        "x-vercel-original-url": req.headers["x-vercel-original-url"],
+        "x-vercel-rewrite-path": req.headers["x-vercel-rewrite-path"],
+        "x-invoke-path": req.headers["x-invoke-path"],
+        host: req.headers.host,
+      },
+    });
     
     const protocol = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers.host;
     
-    // Vercel provides the original URL in x-vercel-original-url header after rewrite
-    // This is the enterprise-grade way to preserve the path
-    let requestUrl = req.headers["x-vercel-original-url"] || req.url || "/";
+    // Vercel rewrite preserves original path in x-vercel-original-url header
+    // If not available, use x-vercel-rewrite-path or reconstruct from req.url
+    let originalPath = req.headers["x-vercel-original-url"] 
+      || req.headers["x-vercel-rewrite-path"] 
+      || req.headers["x-invoke-path"];
     
-    // If we're being called via rewrite to /api/index, extract original path
-    if (requestUrl === "/api/index" || requestUrl.startsWith("/api/index")) {
-      // Check if original path is in headers
-      requestUrl = req.headers["x-invoke-path"] || req.headers["x-vercel-rewrite-path"] || "/";
+    // If still no original path and req.url is /api/index, we need to get it from rewrite
+    // The rewrite pattern "/(.*)" captures the path, but we need to extract it
+    // Check if there's a query param or reconstruct from referer
+    if (!originalPath || originalPath === "/api/index" || originalPath.startsWith("/api/index")) {
+      // Try to reconstruct from req.url if it contains the original path
+      // When rewrite sends to /api/index, the original might be in the URL pattern
+      // For now, default to "/" and let React Router handle 404s for invalid routes
+      originalPath = "/";
+      
+      // Check if we can extract from x-vercel-matched-path (if available)
+      if (req.headers["x-vercel-matched-path"]) {
+        originalPath = req.headers["x-vercel-matched-path"];
+      }
     }
     
-    // Ensure we have a valid URL
-    if (!requestUrl.startsWith("http")) {
-      // Construct full URL if we only have a path
-      const urlObj = new URL(requestUrl, `${protocol}://${host}`);
-      requestUrl = urlObj.toString();
+    // Ensure path starts with /
+    if (!originalPath.startsWith("/")) {
+      originalPath = `/${originalPath}`;
     }
     
-    const url = new URL(requestUrl);
+    // Remove any /api prefix if present
+    if (originalPath.startsWith("/api")) {
+      originalPath = originalPath.replace(/^\/api/, "") || "/";
+    }
+    
+    // Build full URL for React Router
+    // Use the host from headers and construct the full URL
+    const url = new URL(originalPath, `${protocol}://${host}`);
+    
+    // Preserve query string from original request
+    // Check both req.url and headers for query string
+    let queryString = null;
+    if (req.url && req.url.includes("?")) {
+      queryString = req.url.split("?")[1];
+    } else if (req.headers["x-vercel-original-url"] && req.headers["x-vercel-original-url"].includes("?")) {
+      queryString = req.headers["x-vercel-original-url"].split("?")[1];
+    }
+    
+    if (queryString) {
+      url.search = queryString;
+    }
+    
+    console.log("[api/index] Final URL for React Router:", url.toString());
     
     // Handle body parsing for POST/PUT requests
     let body;
