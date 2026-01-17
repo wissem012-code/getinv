@@ -2,7 +2,7 @@
 
 client_id = "135daa7a3f7024fd4c1024abaf4a8130"
 name = "getinv"
-application_url = "https://getinv.vercel.app/
+application_url = "https://getinv.vercel.app"
 embedded = true
 handle = "getinv"
 
