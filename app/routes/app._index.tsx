@@ -83,7 +83,39 @@ async function getAdminIdForShop(shopDomain: string): Promise<{ adminId: string 
 
 export async function loader({ request }: LoaderFunctionArgs) {
       // Logged-in Shopify Admin session (this proves the merchant opened the app)
-      const { session } = await authenticate.admin(request);
+      let session;
+      try {
+        const authResult = await authenticate.admin(request);
+        session = authResult.session;
+      } catch (authError) {
+        console.error(`[loader] Authentication error:`, authError);
+        
+        // Check if it's a database connection error
+        const errorMessage = authError instanceof Error ? authError.message : String(authError);
+        if (errorMessage.includes("DATABASE_URL") || errorMessage.includes("Can't reach database server") || errorMessage.includes("P1001")) {
+          return json({
+            shopDomain: "unknown",
+            clientId: process.env.SHOPIFY_API_KEY || "",
+            externalUrl: "https://getinv.app/",
+            connectionStatus: {
+              connected: false,
+              shopDomain: "unknown",
+              error: "Database connection failed. Please set DATABASE_URL in Vercel environment variables.",
+              errorType: "database",
+              errorDetails: "The app cannot connect to the database. This is required for session management.",
+              troubleshooting: {
+                step1: "Go to Vercel Dashboard → Project Settings → Environment Variables",
+                step2: "Add DATABASE_URL with connection pooling URL (port 6543)",
+                step3: "Format: postgresql://postgres.[PROJECT]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require",
+                step4: "Redeploy the app after adding DATABASE_URL",
+              },
+            },
+          }, { status: 500 });
+        }
+        
+        // Re-throw other authentication errors
+        throw authError;
+      }
 
       // This is the most useful "ID" inside Shopify:
       // Validate shop domain for security
