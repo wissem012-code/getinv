@@ -11,11 +11,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "memory": 1024,
-      "regions": ["fra1"]
+      "memory": 1024
     }
-  },
-  "env": {
-    "NODE_ENV": "production"
   }
 }
