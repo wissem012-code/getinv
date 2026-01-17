@@ -21,9 +21,9 @@ Direct PostgreSQL connections (port 5432) are often **blocked by Supabase** from
 4. Find **Connection Pooling** option (NOT Direct connection)
 5. Select **Transaction** mode (recommended for Prisma)
 
-The URL should look like this:
+The URL should look like this (for eu-west-3 region):
 ```
-postgresql://postgres.utrprngboxriryrgetkp:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true
+postgresql://postgres.utrprngboxriryrgetkp:[PASSWORD]@aws-0-eu-west-3.pooler.supabase.com:6543/postgres?pgbouncer=true
 ```
 
 **Key differences:**
@@ -67,10 +67,10 @@ postgresql://postgres:besemallah125@db.utrprngboxriryrgetkp.supabase.co:5432/pos
 
 ### ✅ CORRECT (Connection Pooling - Port 6543)
 ```
-postgresql://postgres.utrprngboxriryrgetkp:besemallah125@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require
+postgresql://postgres.utrprngboxriryrgetkp:besemallah125@aws-0-eu-west-3.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require
 ```
 
-**Note:** Replace `us-east-1` with your actual Supabase region.
+**Note:** Your Supabase region is `eu-west-3`. If your region is different, replace `eu-west-3` with your actual Supabase region.
 
 ## Testing the Connection
 
