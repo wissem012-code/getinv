@@ -16,17 +16,30 @@ const handleRequest = createRequestHandler({
 
 export default async function handler(req, res) {
   try {
-    // Convert Vercel's req to Web API Request
+    // Enterprise-grade path handling for Vercel serverless functions
+    // Preserve original request path from rewrite using Vercel headers
+    
     const protocol = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers.host;
     
-    // Handle URL path - remove /api prefix if present (from rewrite)
-    let path = req.url || "/";
-    if (path.startsWith("/api")) {
-      path = path.replace("/api", "") || "/";
+    // Vercel provides the original URL in x-vercel-original-url header after rewrite
+    // This is the enterprise-grade way to preserve the path
+    let requestUrl = req.headers["x-vercel-original-url"] || req.url || "/";
+    
+    // If we're being called via rewrite to /api/index, extract original path
+    if (requestUrl === "/api/index" || requestUrl.startsWith("/api/index")) {
+      // Check if original path is in headers
+      requestUrl = req.headers["x-invoke-path"] || req.headers["x-vercel-rewrite-path"] || "/";
     }
     
-    const url = new URL(path, `${protocol}://${host}`);
+    // Ensure we have a valid URL
+    if (!requestUrl.startsWith("http")) {
+      // Construct full URL if we only have a path
+      const urlObj = new URL(requestUrl, `${protocol}://${host}`);
+      requestUrl = urlObj.toString();
+    }
+    
+    const url = new URL(requestUrl);
     
     // Handle body parsing for POST/PUT requests
     let body;
