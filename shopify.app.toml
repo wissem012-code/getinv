@@ -1,32 +1,43 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "135daa7a3f7024fd4c1024abaf4a8130"
+client_id = "63b66c684b0eab60272af927dce8ccaf"
 name = "getinv"
 application_url = "https://shopify.dev/apps/default-app-home"
 embedded = true
+handle = "getinv"
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [webhooks]
-api_version = "2025-10"
+api_version = "2026-04"
 
-  [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
-
-  [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
-
-[access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_inventory,read_inventory,read_locations"
-optional_scopes = [ ]
+scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_orders,write_orders,read_customers,write_customers"
+optional_scopes = [
+  "read_customers",
+  "write_customers",
+  "write_draft_orders",
+  "read_draft_orders",
+  "read_files",
+  "write_files",
+  "read_fulfillments",
+  "write_fulfillments",
+  "write_inventory",
+  "read_inventory",
+  "read_locations",
+  "read_metaobjects",
+  "write_metaobjects",
+  "read_orders",
+  "write_orders",
+  "read_products",
+  "write_products",
+  "read_content",
+  "write_content"
+]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [
-  "https://utrprngboxriryrgetkp.supabase.co/functions/v1/shopify-oauth/callback"
-]
+redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+
+[pos]
+embedded = false

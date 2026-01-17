@@ -2,6 +2,14 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import { SignJWT } from "jose";
 import { authenticate } from "../shopify.server";
+import {
+  validateShopDomain,
+  validateIntent,
+  validateIntervalMinutes,
+  validateAdminId,
+  sanitizeErrorMessage,
+  type ValidIntent,
+} from "../utils/validation.server";
 
 // --------------------
 // Small helper: JSON responses
@@ -39,27 +47,134 @@ function supabaseAdmin() {
 }
 
 // --------------------
+// Error types for better diagnostics
+// --------------------
+export interface ConnectionError {
+  type: "schema_not_exposed" | "permission_denied" | "table_not_found" | "network_error" | "unknown";
+  message: string;
+  details?: string;
+  statusCode?: number;
+}
+
+// --------------------
 // Find the GetInv tenant admin_id linked to this Shopify shop
 // (reads app_private.shopify_shops)
 // --------------------
-async function getAdminIdForShop(shopDomain: string): Promise<string | null> {
-  const supabase = supabaseAdmin();
-
-  const { data, error } = await supabase
-    .schema("app_private")
-    .from("shopify_shops")
-    .select("admin_id")
-    .eq("shop_domain", shopDomain)
-    .maybeSingle();
-
-  if (error) {
-    // Most common cause: app_private not in "Exposed schemas"
-    throw new Error(
-      `Failed to read app_private.shopify_shops. If you see 404/permission issues, add "app_private" to Supabase API -> Exposed schemas. Details: ${error.message}`
-    );
+async function getAdminIdForShop(shopDomain: unknown): Promise<{ adminId: string | null; error?: ConnectionError }> {
+  let validatedShopDomain: string;
+  
+  try {
+    validatedShopDomain = validateShopDomain(shopDomain);
+  } catch (error) {
+    return {
+      adminId: null,
+      error: {
+        type: "unknown",
+        message: error instanceof Error ? error.message : "Invalid shop domain",
+      },
+    };
   }
 
-  return data?.admin_id ?? null;
+  const supabase = supabaseAdmin();
+
+  try {
+    const { data, error } = await supabase
+      .schema("app_private")
+      .from("shopify_shops")
+      .select("admin_id")
+      .eq("shop_domain", shopDomain)
+      .maybeSingle();
+
+    if (error) {
+      // Log error details for debugging
+      const errorMessage = error.message || "Unknown error";
+      const errorCode = typeof (error as { code?: string }).code === "string" ? (error as { code: string }).code : "";
+      const errorDetails = typeof (error as { details?: string }).details === "string" ? (error as { details: string }).details : "";
+
+      console.error(`[getAdminIdForShop] Error querying shopify_shops:`, {
+        shopDomain,
+        errorMessage,
+        errorCode,
+        errorDetails,
+        fullError: error,
+      });
+
+      // Determine error type based on error code/message
+      let errorType: ConnectionError["type"] = "unknown";
+      let statusCode: number | undefined;
+      let message = errorMessage;
+
+      // Check for common Supabase error patterns
+      if (errorCode === "PGRST116" || errorMessage.includes("schema") || errorMessage.includes("does not exist")) {
+        errorType = "schema_not_exposed";
+        message = `Schema 'app_private' is not accessible. Add "app_private" to Supabase API -> Exposed schemas in your Supabase dashboard.`;
+      } else if (errorCode === "PGRST301" || errorMessage.includes("permission") || errorMessage.includes("403")) {
+        errorType = "permission_denied";
+        statusCode = 403;
+        message = `Permission denied accessing app_private.shopify_shops. Check that your SUPABASE_SERVICE_ROLE_KEY has proper permissions.`;
+      } else if (errorMessage.includes("relation") && errorMessage.includes("does not exist")) {
+        errorType = "table_not_found";
+        message = `Table 'app_private.shopify_shops' does not exist. Ensure the table is created in your Supabase database.`;
+      } else if (errorMessage.includes("fetch") || errorMessage.includes("network") || errorMessage.includes("ECONNREFUSED")) {
+        errorType = "network_error";
+        message = `Network error connecting to Supabase: ${errorMessage}`;
+      }
+
+      return {
+        adminId: null,
+        error: {
+          type: errorType,
+          message,
+          details: errorDetails || errorCode,
+          statusCode,
+        },
+      };
+    }
+
+      // Log successful lookup (only in development)
+    if (process.env.NODE_ENV === "development") {
+      console.log(`[getAdminIdForShop] Lookup result:`, {
+        shopDomain: validatedShopDomain,
+        adminId: data?.admin_id || "not found",
+      });
+    }
+
+    // Validate admin ID if found
+    if (data?.admin_id) {
+      try {
+        const validatedAdminId = validateAdminId(data.admin_id);
+        return { adminId: validatedAdminId };
+      } catch (error) {
+        console.error(`[getAdminIdForShop] Invalid admin ID format:`, error);
+        return {
+          adminId: null,
+          error: {
+            type: "unknown",
+            message: "Invalid admin ID format returned from database",
+          },
+        };
+      }
+    }
+
+    return { adminId: null };
+  } catch (e) {
+    // Catch any unexpected errors
+    const errorMessage = e instanceof Error ? e.message : "Unknown error";
+    console.error(`[getAdminIdForShop] Unexpected error:`, {
+      shopDomain,
+      error: errorMessage,
+      stack: e instanceof Error ? e.stack : undefined,
+    });
+
+    return {
+      adminId: null,
+      error: {
+        type: "unknown",
+        message: `Unexpected error: ${errorMessage}`,
+        details: e instanceof Error ? e.stack : String(e),
+      },
+    };
+  }
 }
 
 // --------------------
@@ -95,7 +210,7 @@ async function callEdgeFunction(fnName: string, jwt: string, body?: unknown) {
   });
 
   const text = await res.text();
-  let data: any = null;
+  let data: unknown = null;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
@@ -114,7 +229,33 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const { session } = await authenticate.admin(request);
     const shopDomain = session.shop;
 
-    const adminId = await getAdminIdForShop(shopDomain);
+    console.log(`[loader] Checking connection for shop: ${shopDomain}`);
+
+    const { adminId, error: connectionError } = await getAdminIdForShop(shopDomain);
+
+    // If there was a connection error (not just "not found"), return error details
+    if (connectionError) {
+      console.error(`[loader] Connection error:`, connectionError);
+      return jsonResponse(
+        {
+          connected: false,
+          shopDomain,
+          error: connectionError.message,
+          errorType: connectionError.type,
+          errorDetails: connectionError.details,
+          troubleshooting: {
+            schema_not_exposed:
+              "Go to Supabase Dashboard → API → Exposed schemas → Add 'app_private'",
+            permission_denied:
+              "Check that SUPABASE_SERVICE_ROLE_KEY has access to app_private schema",
+            table_not_found:
+              "Ensure app_private.shopify_shops table exists in your Supabase database",
+            network_error: "Check SUPABASE_URL and network connectivity",
+          },
+        },
+        { status: connectionError.statusCode || 500 }
+      );
+    }
 
     if (!adminId) {
       return jsonResponse({
@@ -124,6 +265,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
           "This Shopify store is installed, but it is not linked to a GetInv tenant yet. Link it from your GetInv app first.",
       });
     }
+
+    console.log(`[loader] Shop connected, adminId: ${adminId}`);
 
     const supabase = supabaseAdmin();
     const { data: settings, error } = await supabase
@@ -135,6 +278,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       .maybeSingle();
 
     if (error) {
+      console.error(`[loader] Error fetching settings:`, error);
       return jsonResponse(
         { connected: true, shopDomain, adminId, settings: null, error: error.message },
         { status: 200 }
@@ -148,8 +292,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       settings: settings ?? null,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return jsonResponse({ error: msg }, { status: 500 });
+    const msg = sanitizeErrorMessage(e, process.env.NODE_ENV === "production");
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error(`[loader] Unexpected error:`, { error: msg, stack });
+    return jsonResponse({ error: msg, ...(process.env.NODE_ENV === "development" && { stack }) }, { status: 500 });
   }
 }
 
@@ -166,7 +312,24 @@ export async function action({ request }: ActionFunctionArgs) {
     const { session } = await authenticate.admin(request);
     const shopDomain = session.shop;
 
-    const adminId = await getAdminIdForShop(shopDomain);
+    console.log(`[action] Processing request for shop: ${shopDomain}`);
+
+    const { adminId, error: connectionError } = await getAdminIdForShop(shopDomain);
+
+    // If there was a connection error, return it
+    if (connectionError) {
+      console.error(`[action] Connection error:`, connectionError);
+      return jsonResponse(
+        {
+          ok: false,
+          error: connectionError.message,
+          errorType: connectionError.type,
+          errorDetails: connectionError.details,
+        },
+        { status: connectionError.statusCode || 500 }
+      );
+    }
+
     if (!adminId) {
       return jsonResponse(
         {
@@ -178,40 +341,82 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
 
-    const body = await request.json().catch(() => ({} as any));
-    const intent = String((body as any)?.intent || "");
+    let body: Record<string, unknown> = {};
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse({ ok: false, error: "Invalid JSON in request body" }, { status: 400 });
+    }
+
+    // Validate intent
+    let intent: ValidIntent;
+    try {
+      intent = validateIntent(body.intent);
+    } catch (error) {
+      return jsonResponse(
+        { ok: false, error: sanitizeErrorMessage(error) },
+        { status: 400 }
+      );
+    }
+
+    // Validate admin ID before using it
+    let validatedAdminId: string;
+    try {
+      validatedAdminId = validateAdminId(adminId);
+    } catch (error) {
+      return jsonResponse(
+        { ok: false, error: "Invalid admin ID format" },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[action] Intent: ${intent}, adminId: ${validatedAdminId}`);
 
     // Create your custom JWT (server-side)
-    const jwt = await mintAppJwt(adminId);
+    const jwt = await mintAppJwt(validatedAdminId);
 
     if (intent === "pull") {
+      console.log(`[action] Calling shopify-pull-products`);
       const r = await callEdgeFunction("shopify-pull-products", jwt, {});
+      console.log(`[action] Pull result:`, { ok: r.ok, status: r.status });
       return jsonResponse(r.data, { status: r.status });
     }
 
     if (intent === "push_changed") {
+      console.log(`[action] Calling shopify-push-products (changed)`);
       const r = await callEdgeFunction("shopify-push-products", jwt, { mode: "changed" });
+      console.log(`[action] Push changed result:`, { ok: r.ok, status: r.status });
       return jsonResponse(r.data, { status: r.status });
     }
 
     if (intent === "push_all") {
+      console.log(`[action] Calling shopify-push-products (all)`);
       const r = await callEdgeFunction("shopify-push-products", jwt, { mode: "all", force: true });
+      console.log(`[action] Push all result:`, { ok: r.ok, status: r.status });
       return jsonResponse(r.data, { status: r.status });
     }
 
     if (intent === "toggle_auto") {
-      const enabled = Boolean((body as any)?.enabled);
-      const intervalMinutes =
-        typeof (body as any)?.intervalMinutes === "number"
-          ? (body as any).intervalMinutes
-          : 15;
+      const enabled = Boolean(body.enabled);
+      
+      let intervalMinutes: number;
+      try {
+        intervalMinutes = validateIntervalMinutes(body.intervalMinutes, 15);
+      } catch (error) {
+        return jsonResponse(
+          { ok: false, error: sanitizeErrorMessage(error) },
+          { status: 400 }
+        );
+      }
+
+      console.log(`[action] Toggling auto-sync:`, { enabled, intervalMinutes });
 
       const supabase = supabaseAdmin();
       const { error } = await supabase
         .from("shopify_settings")
         .upsert(
           {
-            admin_id: adminId,
+            admin_id: validatedAdminId,
             auto_sync_enabled: enabled,
             auto_sync_interval_minutes: intervalMinutes,
             updated_at: new Date().toISOString(),
@@ -220,9 +425,11 @@ export async function action({ request }: ActionFunctionArgs) {
         );
 
       if (error) {
+        console.error(`[action] Error updating settings:`, error);
         return jsonResponse({ ok: false, error: error.message }, { status: 500 });
       }
 
+      console.log(`[action] Auto-sync updated successfully`);
       return jsonResponse({
         ok: true,
         auto_sync_enabled: enabled,
@@ -230,9 +437,27 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
+    console.warn(`[action] Unknown intent: ${intent}`);
     return jsonResponse({ ok: false, error: "Unknown intent" }, { status: 400 });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return jsonResponse({ ok: false, error: msg }, { status: 500 });
+    const msg = sanitizeErrorMessage(e, process.env.NODE_ENV === "production");
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error(`[action] Unexpected error:`, { error: msg, stack });
+    return jsonResponse(
+      {
+        ok: false,
+        error: msg,
+        ...(process.env.NODE_ENV === "development" && { stack }),
+      },
+      { status: 500 }
+    );
   }
+}
+
+// --------------------
+// Default component export
+// This route only returns JSON from loader/action, so the component returns null
+// --------------------
+export default function SyncApi() {
+  return null;
 }
