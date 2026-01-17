@@ -209,16 +209,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   } catch (e) {
     console.error(`[loader] Unexpected error:`, e);
+    const errorMessage = sanitizeErrorMessage(e);
+    const errorType = e instanceof Error && e.message.includes("DATABASE_URL") ? "database" : "unknown";
+    
     connectionStatus = {
       connected: false,
-      shopDomain,
-      error: sanitizeErrorMessage(e),
-      errorType: "unknown",
+      shopDomain: shopDomain || "unknown",
+      error: errorMessage,
+      errorType,
+      errorDetails: process.env.NODE_ENV === "production" 
+        ? undefined 
+        : (e instanceof Error ? e.stack : String(e)),
     };
   }
 
   return json({
-    shopDomain,
+    shopDomain: shopDomain || "unknown",
     clientId,
     externalUrl: "https://getinv.app/",
     connectionStatus,
