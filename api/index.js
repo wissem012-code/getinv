@@ -19,7 +19,14 @@ export default async function handler(req, res) {
     // Convert Vercel's req to Web API Request
     const protocol = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers.host;
-    const url = new URL(req.url || "/", `${protocol}://${host}`);
+    
+    // Handle URL path - remove /api prefix if present (from rewrite)
+    let path = req.url || "/";
+    if (path.startsWith("/api")) {
+      path = path.replace("/api", "") || "/";
+    }
+    
+    const url = new URL(path, `${protocol}://${host}`);
     
     // Handle body parsing for POST/PUT requests
     let body;
