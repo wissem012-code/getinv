@@ -32,25 +32,37 @@ export default async function handler(req, res) {
     const protocol = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers.host;
     
-    // Vercel rewrite preserves original path in x-vercel-original-url header
-    // If not available, use x-vercel-rewrite-path or reconstruct from req.url
-    let originalPath = req.headers["x-vercel-original-url"] 
+    // Enterprise-grade path extraction from Vercel rewrite
+    // When rewrite "/(.*)" -> "/api/index", the original path is in x-vercel-matched-path header
+    // Or we need to check x-vercel-original-url
+    let originalPath = req.headers["x-vercel-matched-path"] 
+      || req.headers["x-vercel-original-url"] 
       || req.headers["x-vercel-rewrite-path"] 
       || req.headers["x-invoke-path"];
     
-    // If still no original path and req.url is /api/index, we need to get it from rewrite
-    // The rewrite pattern "/(.*)" captures the path, but we need to extract it
-    // Check if there's a query param or reconstruct from referer
+    // Extract path from full URL if header contains full URL
+    if (originalPath && originalPath.startsWith("http")) {
+      try {
+        const urlObj = new URL(originalPath);
+        originalPath = urlObj.pathname + urlObj.search;
+      } catch {
+        // Invalid URL, use default
+        originalPath = "/";
+      }
+    }
+    
+    // If still no original path and req.url is /api/index, we've lost the path
+    // In this case, default to "/" and React Router will handle routing
     if (!originalPath || originalPath === "/api/index" || originalPath.startsWith("/api/index")) {
-      // Try to reconstruct from req.url if it contains the original path
-      // When rewrite sends to /api/index, the original might be in the URL pattern
-      // For now, default to "/" and let React Router handle 404s for invalid routes
+      // When all else fails, default to root
+      // This will cause 404s for deep routes, but at least the app will load
       originalPath = "/";
       
-      // Check if we can extract from x-vercel-matched-path (if available)
-      if (req.headers["x-vercel-matched-path"]) {
-        originalPath = req.headers["x-vercel-matched-path"];
-      }
+      // Log this case so we can debug
+      console.warn("[api/index] Could not extract original path from rewrite, defaulting to /", {
+        reqUrl: req.url,
+        headers: Object.keys(req.headers).filter(h => h.toLowerCase().includes("vercel") || h.toLowerCase().includes("path")),
+      });
     }
     
     // Ensure path starts with /
