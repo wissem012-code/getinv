@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "63b66c684b0eab60272af927dce8ccaf"
+client_id = "135daa7a3f7024fd4c1024abaf4a8130"
 name = "getinv"
 application_url = "https://shopify.dev/apps/default-app-home"
 embedded = true
@@ -12,7 +12,7 @@ automatically_update_urls_on_dev = true
 [webhooks]
 api_version = "2026-04"
 
-scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_orders,write_orders,read_customers,write_customers"
+scopes = "read_products,write_products,read_inventory,write_inventory,read_locations,read_orders,write_orders,read_customers,write_customers,write_draft_orders,read_draft_orders,read_files,write_files,read_fulfillments,write_fulfillments"
 optional_scopes = [
   "read_customers",
   "write_customers",
@@ -37,7 +37,7 @@ optional_scopes = [
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+redirect_urls = [ "https://utrprngboxriryrgetkp.supabase.co/functions/v1/shopify-oauth/callback" ]
 
 [pos]
 embedded = false
