@@ -2,9 +2,11 @@
   "version": 2,
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "build/client",
+  "cleanUrls": false,
+  "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!assets|favicon.ico|.*\\..*).*)",
       "destination": "/api/index"
     }
   ]
