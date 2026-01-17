@@ -22,11 +22,25 @@ if (!databaseUrl) {
   // The actual connection will fail at runtime if DATABASE_URL is not set
   process.env.DATABASE_URL = 'postgresql://user:password@localhost:5432/dbname';
   process.env.DIRECT_URL = process.env.DATABASE_URL; // Use same placeholder if DIRECT_URL not set
-} else if (!process.env.DIRECT_URL) {
-  // If DIRECT_URL is not set, use DATABASE_URL as fallback (not ideal, but works)
-  process.env.DIRECT_URL = databaseUrl;
-  console.warn('⚠️  DIRECT_URL not set - using DATABASE_URL for migrations');
-  console.warn('   For enterprise setup, set DIRECT_URL to direct connection (port 5432)');
+} else {
+  // Check if DIRECT_URL is set but using pooler format (WRONG)
+  const directUrl = process.env.DIRECT_URL;
+  if (directUrl) {
+    // Check if DIRECT_URL uses pooler hostname instead of direct connection
+    if (directUrl.includes('.pooler.supabase.com')) {
+      console.error('❌ ERROR: DIRECT_URL is using pooler format (WRONG for migrations)');
+      console.error('   Current DIRECT_URL host:', directUrl.split('@')[1]?.split(':')[0] || 'unknown');
+      console.error('   DIRECT_URL should use TRUE direct connection: db.[PROJECT].supabase.co');
+      console.error('   Fix: Change DIRECT_URL host from "aws-0-[REGION].pooler.supabase.com" to "db.[PROJECT].supabase.co"');
+      console.error('   Example: postgresql://postgres:[PASSWORD]@db.utrprngboxriryrgetkp.supabase.co:5432/postgres?sslmode=require');
+    }
+  } else {
+    // If DIRECT_URL is not set, use DATABASE_URL as fallback (not ideal, but works)
+    process.env.DIRECT_URL = databaseUrl;
+    console.warn('⚠️  DIRECT_URL not set - using DATABASE_URL for migrations');
+    console.warn('   For enterprise setup, set DIRECT_URL to direct connection (port 5432)');
+    console.warn('   DIRECT_URL should use: db.[PROJECT].supabase.co (NOT .pooler.supabase.com)');
+  }
 }
 
 try {

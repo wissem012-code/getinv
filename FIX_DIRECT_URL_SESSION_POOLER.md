@@ -51,15 +51,23 @@ postgresql://postgres.utrprngboxriryrgetkp:[PASSWORD]@aws-0-eu-central-1.pooler.
 ```
 
 ### DIRECT_URL (Direct - Port 5432) ⚠️ NEEDS FIX
+
 **Current (WRONG - Session Pooler):**
 ```
 postgresql://postgres.utrprngboxriryrgetkp:[PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
 ```
+❌ Problem: Uses `.pooler.supabase.com` hostname (still a pooler, even though port is 5432)
 
-**Should be (CORRECT - Direct Connection):**
+**Should be (CORRECT - True Direct Connection):**
 ```
 postgresql://postgres:[PASSWORD]@db.utrprngboxriryrgetkp.supabase.co:5432/postgres?sslmode=require
 ```
+✅ Solution: Uses `db.xxx.supabase.co` hostname (true direct connection)
+
+**Key Differences:**
+- Host: `db.utrprngboxriryrgetkp.supabase.co` (NOT `aws-0-eu-central-1.pooler.supabase.com`)
+- User: `postgres` (NOT `postgres.utrprngboxriryrgetkp`)
+- No pooler in the hostname
 
 ## Region Note
 
