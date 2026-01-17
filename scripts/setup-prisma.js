@@ -34,11 +34,20 @@ try {
   execSync('npx prisma generate', { stdio: 'inherit' });
   console.log('✅ Prisma Client generated successfully');
   
-  // Only run migrations if DIRECT_URL is actually set (not placeholder)
+  // Only run migrations if DIRECT_URL is actually set (not placeholder) AND uses direct connection
   const isValidDirectUrl = directUrl && directUrl !== 'postgresql://user:password@localhost:5432/dbname';
+  const isDirectConnection = directUrl && directUrl.includes(':5432') && !directUrl.includes(':6543');
   
-  if (isValidDirectUrl) {
-    console.log('🔄 Running database migrations using DIRECT_URL...');
+  // Check if DATABASE_URL is using wrong connection type (should be pooled for runtime)
+  if (databaseUrl && databaseUrl.includes(':5432') && !databaseUrl.includes(':6543')) {
+    console.warn('⚠️  WARNING: DATABASE_URL is using direct connection (port 5432)');
+    console.warn('   DATABASE_URL should use POOLED connection (port 6543) for serverless runtime!');
+    console.warn('   Current: port 5432 (direct) - will fail in serverless environment');
+    console.warn('   Should be: port 6543 (pooled) - postgresql://postgres.[PROJECT]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/...');
+  }
+  
+  if (isValidDirectUrl && isDirectConnection) {
+    console.log('🔄 Running database migrations using DIRECT_URL (port 5432)...');
     try {
       // Use DIRECT_URL for migrations (direct connection, more reliable for schema operations)
       execSync('npx prisma migrate deploy', { 
@@ -59,20 +68,17 @@ try {
       
       if (isVercelBuild) {
         console.warn('   📝 Migrations will run automatically on first app request');
-        if (directUrl.includes(':5432')) {
-          console.warn('   ✅ Using direct connection (port 5432) for migrations - correct for migrations');
-        } else if (directUrl.includes(':6543')) {
-          console.warn('   ⚠️  Using pooled connection for migrations - consider setting DIRECT_URL to direct connection');
-        }
-      } else {
-        console.warn('   ⚠️  Make sure your database is accessible and DIRECT_URL is correct');
-        console.warn('   💡 DIRECT_URL should use direct connection (port 5432), not pooled (port 6543)');
+        console.warn('   💡 Make sure DIRECT_URL uses direct connection (port 5432)');
       }
       // Don't exit on migration failure - the app can still work
       // Migrations can run on first request or manually
     }
+  } else if (isValidDirectUrl && !isDirectConnection) {
+    console.warn('⚠️  Skipping migrations - DIRECT_URL is using pooled connection (port 6543)');
+    console.warn('   DIRECT_URL should use DIRECT connection (port 5432) for migrations');
+    console.warn('   Migrations will run automatically on first app request');
   } else {
-    console.warn('⏭️  Skipping migrations - DIRECT_URL not configured');
+    console.warn('⏭️  Skipping migrations - DIRECT_URL not configured or invalid');
     console.warn('   Set DIRECT_URL in Vercel to enable database migrations');
     console.warn('   DIRECT_URL should use direct connection (port 5432) for migrations');
   }
