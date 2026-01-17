@@ -11,7 +11,7 @@
     "env": "shopify app env",
     "start": "react-router-serve ./build/server/index.js",
     "docker-start": "npm run setup && npm run start",
-    "setup": "prisma generate",
+    "setup": "prisma generate && prisma migrate deploy",
     "postinstall": "prisma generate",
     "vercel-build": "npm run build && npm run setup",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
