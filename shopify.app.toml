@@ -10,7 +10,7 @@ handle = "getinv"
 automatically_update_urls_on_dev = true
 
 [webhooks]
-api_version = "2026-04"
+api_version = "2025-04"
 
 # Mandatory Compliance Webhooks (Required when app has access to customer data)
 # These webhooks are mandatory for GDPR/privacy compliance
