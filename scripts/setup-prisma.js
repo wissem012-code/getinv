@@ -77,12 +77,27 @@ try {
     } catch (migrationError) {
       // Migration failures during build are not critical - they can run at runtime
       const errorMessage = migrationError instanceof Error ? migrationError.message : String(migrationError);
-      console.warn('⚠️  Migration failed during build (this is often normal for serverless):');
-      console.warn(`   ${errorMessage}`);
+      const errorOutput = migrationError instanceof Error ? errorMessage : String(migrationError);
       
-      if (isVercelBuild) {
-        console.warn('   📝 Migrations will run automatically on first app request');
-        console.warn('   💡 Make sure DIRECT_URL uses direct connection (port 5432)');
+      // Check for P3005 error (database schema not empty - needs baseline)
+      if (errorOutput.includes('P3005') || errorOutput.includes('database schema is not empty')) {
+        console.warn('⚠️  P3005 Error: Database schema is not empty');
+        console.warn('   This means the database already has tables, but Prisma doesn\'t have migration history.');
+        console.warn('   Solution: You need to baseline the existing migration.');
+        console.warn('');
+        console.warn('   To fix this, run locally or in a one-off script:');
+        console.warn('   npx prisma migrate resolve --applied 20240530213853_create_session_table');
+        console.warn('');
+        console.warn('   Then redeploy. The migration will be marked as applied and future migrations will work.');
+        console.warn('   📝 For now, skipping migration - app may still work if tables already exist');
+      } else {
+        console.warn('⚠️  Migration failed during build (this is often normal for serverless):');
+        console.warn(`   ${errorMessage}`);
+        
+        if (isVercelBuild) {
+          console.warn('   📝 Migrations will run automatically on first app request');
+          console.warn('   💡 Make sure DIRECT_URL uses direct connection (port 5432)');
+        }
       }
       // Don't exit on migration failure - the app can still work
       // Migrations can run on first request or manually
