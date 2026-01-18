@@ -8,16 +8,11 @@
 
 import { createRequestHandler } from "@react-router/node";
 import { join } from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 
-// Enterprise-grade import path resolution for Vercel serverless functions
-// Use absolute path to avoid path resolution issues in serverless environment
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// api/index.js is at root/api/index.js, so __dirname is root/api/
-// Go up one level to root, then into build/server
-const buildPath = join(__dirname, "..", "build", "server", "index.js");
+// Enterprise-grade import path resolution using process.cwd() 
+// process.cwd() returns the project root in Vercel serverless functions
+// This avoids relative path resolution issues that cause build/server/server/index.js
+const buildPath = join(process.cwd(), "build", "server", "index.js");
 const build = await import(buildPath);
 
 const handleRequest = createRequestHandler({
