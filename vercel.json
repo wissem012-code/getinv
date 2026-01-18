@@ -1,14 +1,4 @@
 {
   "version": 2,
-  "buildCommand": "npm run vercel-build",
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/api/index"
-    }
-  ]
+  "buildCommand": "npm run vercel-build"
 }
