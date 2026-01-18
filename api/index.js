@@ -7,7 +7,8 @@
  */
 
 import { createRequestHandler } from "@react-router/node";
-import * as build from "../build/server/index.js";
+// Import path works both from root (../build/server) and from build/client/api (../../server)
+import * as build from "../../server/index.js";
 
 const handleRequest = createRequestHandler({
   build,
