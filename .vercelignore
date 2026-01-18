@@ -9,7 +9,11 @@ node_modules
 !.env.example
 
 # Build artifacts (will be rebuilt)
-build
+# Note: Excluding 'build' but NOT excluding root 'api/' directory
+# Vercel needs 'api/' at root for serverless function detection
+# Exclude specific build subdirectories but allow root api/ to be deployed
+build/client
+build/server
 .react-router
 
 # Shopify development files
