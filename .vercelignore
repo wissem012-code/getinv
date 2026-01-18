@@ -9,11 +9,10 @@ node_modules
 !.env.example
 
 # Build artifacts (will be rebuilt)
-# Exclude build/client from root (deployed via outputDirectory)
-# BUT DO NOT exclude build/server - needed by api/index.js serverless function
-# Root api/ directory is NOT excluded - needed for serverless function detection
-build/client
-# Note: build/server is needed by root api/index.js, so we keep it in deployment
+# Note: build/client and build/server are both needed for deployment
+# build/client - static assets (React Router client build)
+# build/server - server build needed by api/index.js serverless function
+# Only exclude build subdirectories that aren't needed
 .react-router
 
 # Shopify development files
