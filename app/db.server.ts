@@ -1,41 +1,77 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaClientInitializationError } from "@prisma/client/runtime/library";
 
 declare global {
   // eslint-disable-next-line no-var
-  var prismaGlobal: PrismaClient;
+  var __prismaClient: PrismaClient | undefined;
 }
 
 /**
- * Enterprise-grade Prisma Client initialization with error handling
- * Handles missing DATABASE_URL gracefully for better error messages
+ * Lazy-loaded Prisma Client initialization
+ * 
+ * The client is NOT created at module load time. Instead, it's created
+ * on first access. This prevents serverless function crashes when
+ * DATABASE_URL is missing or invalid during module initialization.
+ * 
+ * The crash used to happen in the import chain:
+ *   entry.server.tsx -> shopify.server.ts -> db.server.ts -> CRASH
+ * 
+ * Now the Prisma client is only instantiated when actually used.
  */
-function createPrismaClient(): PrismaClient {
+
+let prismaInstance: PrismaClient | undefined;
+
+function getPrismaClient(): PrismaClient {
+  // Return existing instance if available
+  if (prismaInstance) {
+    return prismaInstance;
+  }
+
+  // In development, use global to preserve client across hot reloads
+  if (process.env.NODE_ENV !== "production" && global.__prismaClient) {
+    prismaInstance = global.__prismaClient;
+    return prismaInstance;
+  }
+
+  // Create new client on first access
   try {
-    return new PrismaClient({
+    console.log("[Prisma] Initializing database client (lazy-loaded)...");
+    prismaInstance = new PrismaClient({
       log: process.env.NODE_ENV === "production" ? ["error"] : ["query", "error", "warn"],
     });
-  } catch (error) {
-    // Check if error is due to missing DATABASE_URL
-    if (error instanceof PrismaClientInitializationError) {
-      if (error.errorCode === "P1001" || error.message.includes("DATABASE_URL") || error.message.includes("Can't reach database server")) {
-        console.error("❌ [Prisma] DATABASE_URL is missing or invalid:");
-        console.error("   Error:", error.message);
-        console.error("   Fix: Set DATABASE_URL in Vercel environment variables");
-        console.error("   Use connection pooling (port 6543) for serverless: postgresql://postgres.[PROJECT]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true");
-        throw new Error("Database connection failed: DATABASE_URL is missing or invalid. Check Vercel environment variables.");
-      }
+
+    // Store in global for development hot reloads
+    if (process.env.NODE_ENV !== "production") {
+      global.__prismaClient = prismaInstance;
     }
+
+    return prismaInstance;
+  } catch (error) {
+    console.error("❌ [Prisma] Failed to initialize database client:");
+    console.error("   Error:", error instanceof Error ? error.message : String(error));
+    console.error("   Fix: Ensure DATABASE_URL is set correctly in environment variables");
+    console.error("   For Supabase: postgresql://postgres.[PROJECT]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true");
     throw error;
   }
 }
 
-if (process.env.NODE_ENV !== "production") {
-  if (!global.prismaGlobal) {
-    global.prismaGlobal = createPrismaClient();
-  }
-}
-
-const prisma = global.prismaGlobal ?? createPrismaClient();
+/**
+ * Lazy-loaded Prisma client using Proxy
+ * 
+ * This Proxy looks and behaves exactly like a PrismaClient, but defers
+ * actual client creation until a property or method is accessed.
+ * 
+ * This prevents crashes at module load time when DATABASE_URL is unavailable.
+ */
+const prisma = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    const client = getPrismaClient();
+    const value = client[property as keyof PrismaClient];
+    // Bind methods to the client instance
+    if (typeof value === "function") {
+      return value.bind(client);
+    }
+    return value;
+  },
+});
 
 export default prisma;

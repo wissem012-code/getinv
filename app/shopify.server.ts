@@ -5,7 +5,46 @@ import {
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
+import type { Session } from "@shopify/shopify-api";
 import prisma from "./db.server";
+
+/**
+ * Lazy Session Storage Wrapper
+ * 
+ * This wrapper defers the creation of PrismaSessionStorage until a session
+ * operation is actually performed. This prevents the Prisma client from being
+ * initialized at module load time, which would cause serverless function crashes
+ * when DATABASE_URL is missing or invalid.
+ * 
+ * The PrismaSessionStorage is only created on first use of any session method.
+ */
+let prismaSessionStorage: PrismaSessionStorage | null = null;
+
+function getSessionStorage(): PrismaSessionStorage {
+  if (!prismaSessionStorage) {
+    console.log("[SessionStorage] Initializing PrismaSessionStorage (lazy-loaded)...");
+    prismaSessionStorage = new PrismaSessionStorage(prisma);
+  }
+  return prismaSessionStorage;
+}
+
+const lazySessionStorage = {
+  async storeSession(session: Session): Promise<boolean> {
+    return getSessionStorage().storeSession(session);
+  },
+  async loadSession(id: string): Promise<Session | undefined> {
+    return getSessionStorage().loadSession(id);
+  },
+  async deleteSession(id: string): Promise<boolean> {
+    return getSessionStorage().deleteSession(id);
+  },
+  async deleteSessions(ids: string[]): Promise<boolean> {
+    return getSessionStorage().deleteSessions(ids);
+  },
+  async findSessionsByShop(shop: string): Promise<Session[]> {
+    return getSessionStorage().findSessionsByShop(shop);
+  },
+};
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -14,7 +53,7 @@ const shopify = shopifyApp({
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
-  sessionStorage: new PrismaSessionStorage(prisma),
+  sessionStorage: lazySessionStorage,
   distribution: AppDistribution.AppStore,
   future: {
     expiringOfflineAccessTokens: true,
