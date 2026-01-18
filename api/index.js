@@ -7,9 +7,8 @@
  */
 
 import { createRequestHandler } from "@react-router/node";
-// Import path: from build/client/api/index.js to build/client/server/index.js
-// When deployed, build/client/ is the root, so this becomes ../server/index.js
-import * as build from "../server/index.js";
+// Import from build/server (when api/ is at root, not in build/client)
+import * as build from "../build/server/index.js";
 
 const handleRequest = createRequestHandler({
   build,
