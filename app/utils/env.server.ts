@@ -173,24 +173,6 @@ export function getEnv(): EnvConfig {
   return cachedEnv;
 }
 
-// Validate on module load (non-blocking warning in development)
-if (process.env.NODE_ENV !== "test") {
-  try {
-    getEnv();
-    if (process.env.NODE_ENV === "development") {
-      console.log("✓ Environment variables validated successfully");
-    }
-  } catch (error) {
-    if (error instanceof EnvValidationError) {
-      console.error(`✗ ${error.message}`);
-      if (process.env.NODE_ENV === "production") {
-        // In production, fail fast
-        throw error;
-      }
-      // In development, warn but continue
-      console.warn("Environment validation failed. The app may not work correctly.");
-    } else {
-      throw error;
-    }
-  }
-}
+// NOTE: Validation is now LAZY - only runs when getEnv() is called
+// This prevents serverless function crashes at module load time
+// Call getEnv() explicitly where you need validated environment variables

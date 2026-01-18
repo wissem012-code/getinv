@@ -16,8 +16,8 @@
       "routes/webhooks.app.uninstalled": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/webhooks.shop.redact": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/api.health.database": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
-      "routes/New Text Document": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/auth.login": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
+      "routes/api.debug": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/api.sync": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/api.sync.health": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
       "routes/auth.$": "nodejs_eyJydW50aW1lIjoibm9kZWpzIn0",
@@ -86,20 +86,20 @@
           "runtime": "nodejs"
         }
       },
-      "routes/New Text Document": {
-        "id": "routes/New Text Document",
-        "parentId": "root",
-        "file": "app/routes/New Text Document.txt",
-        "path": "New Text Document",
-        "config": {
-          "runtime": "nodejs"
-        }
-      },
       "routes/auth.login": {
         "id": "routes/auth.login",
         "parentId": "root",
         "file": "app/routes/auth.login/route.tsx",
         "path": "auth/login",
+        "config": {
+          "runtime": "nodejs"
+        }
+      },
+      "routes/api.debug": {
+        "id": "routes/api.debug",
+        "parentId": "root",
+        "file": "app/routes/api.debug.ts",
+        "path": "api/debug",
         "config": {
           "runtime": "nodejs"
         }
@@ -219,17 +219,17 @@
         "file": "routes/api.health.database.ts",
         "path": "api/health/database"
       },
-      "routes/New Text Document": {
-        "id": "routes/New Text Document",
-        "parentId": "root",
-        "file": "routes/New Text Document.txt",
-        "path": "New Text Document"
-      },
       "routes/auth.login": {
         "id": "routes/auth.login",
         "parentId": "root",
         "file": "routes/auth.login/route.tsx",
         "path": "auth/login"
+      },
+      "routes/api.debug": {
+        "id": "routes/api.debug",
+        "parentId": "root",
+        "file": "routes/api.debug.ts",
+        "path": "api/debug"
       },
       "routes/api.sync": {
         "id": "routes/api.sync",
@@ -319,14 +319,14 @@
             "path": "api/health/database"
           },
           {
-            "id": "routes/New Text Document",
-            "file": "routes/New Text Document.txt",
-            "path": "New Text Document"
-          },
-          {
             "id": "routes/auth.login",
             "file": "routes/auth.login/route.tsx",
             "path": "auth/login"
+          },
+          {
+            "id": "routes/api.debug",
+            "file": "routes/api.debug.ts",
+            "path": "api/debug"
           },
           {
             "id": "routes/api.sync",
