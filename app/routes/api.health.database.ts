@@ -1,5 +1,11 @@
 import type { LoaderFunctionArgs } from "react-router";
 
+function jsonResponse(data: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  return new Response(JSON.stringify(data, null, 2), { ...init, headers });
+}
+
 /**
  * GET /api/health/database
  * 
@@ -9,7 +15,9 @@ import type { LoaderFunctionArgs } from "react-router";
  * This helps diagnose 500 errors on /app routes caused by database issues.
  */
 export async function loader({ request }: LoaderFunctionArgs) {
-  const diagnostics: {
+  // Wrap everything in try-catch to catch any crash
+  try {
+    const diagnostics: {
     timestamp: string;
     database: {
       configured: boolean;
@@ -147,6 +155,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
     diagnostics.sessionTable.accessible;
 
   return jsonResponse({ healthy: isHealthy, ...diagnostics }, { status: isHealthy ? 200 : 503 });
+  } catch (fatalError) {
+    // Catch any unexpected crash and return details
+    return jsonResponse({
+      healthy: false,
+      error: "Fatal error in health check",
+      message: fatalError instanceof Error ? fatalError.message : String(fatalError),
+      stack: fatalError instanceof Error ? fatalError.stack : undefined,
+      timestamp: new Date().toISOString(),
+    }, { status: 500 });
+  }
 }
 
 /**
@@ -174,12 +192,6 @@ function getDatabaseUrlFormat(): string {
   } catch {
     return "invalid_format";
   }
-}
-
-function jsonResponse(data: unknown, init: ResponseInit = {}) {
-  const headers = new Headers(init.headers);
-  headers.set("Content-Type", "application/json; charset=utf-8");
-  return new Response(JSON.stringify(data, null, 2), { ...init, headers });
 }
 
 export default function HealthDatabase() {
