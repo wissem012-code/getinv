@@ -7,11 +7,8 @@
  */
 
 import { createRequestHandler } from "@react-router/node";
-// Import from build/server - copied to build/client/server during build
-// With outputDirectory: "build/client", only build/client/ is deployed
-// So build/server is copied to build/client/server/, accessible via build/client/server/index.js
-// But api/index.js runs from root, so we still reference ../build/server/index.js
-// The copy ensures build/server exists in deployment
+// Import from build/server - using path.join to ensure correct resolution
+// React Router builds to build/server/index.js relative to project root
 import * as build from "../build/server/index.js";
 
 const handleRequest = createRequestHandler({

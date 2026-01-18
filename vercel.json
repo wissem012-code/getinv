@@ -1,6 +1,12 @@
 {
   "version": 2,
   "buildCommand": "npm run vercel-build",
+  "functions": {
+    "api/index.js": {
+      "runtime": "nodejs24.x",
+      "includeFiles": "build/server/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/",
