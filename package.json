@@ -15,7 +15,7 @@
     "setup:with-migrations": "prisma generate && prisma migrate deploy",
     "baseline": "node scripts/baseline-migration.js",
     "postinstall": "prisma generate",
-    "vercel-build": "npm run setup && npm run build",
+    "vercel-build": "npm run setup && npm run build && node scripts/copy-api-for-vercel.js",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "shopify": "shopify",
     "prisma": "prisma",
