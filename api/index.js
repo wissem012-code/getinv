@@ -7,13 +7,9 @@
  */
 
 import { createRequestHandler } from "@react-router/node";
-import { join } from "path";
-
-// Enterprise-grade import path resolution using process.cwd() 
-// process.cwd() returns the project root in Vercel serverless functions
-// This avoids relative path resolution issues that cause build/server/server/index.js
-const buildPath = join(process.cwd(), "build", "server", "index.js");
-const build = await import(buildPath);
+// Simple static import - React Router builds to build/server/index.js at project root
+// api/index.js is at root/api/index.js, so ../build/server/index.js resolves correctly
+import * as build from "../build/server/index.js";
 
 const handleRequest = createRequestHandler({
   build,
