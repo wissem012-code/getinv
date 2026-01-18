@@ -7,9 +7,20 @@
  */
 
 import { createRequestHandler } from "@react-router/node";
-// Simple static import - React Router builds to build/server/index.js at project root
-// api/index.js is at root/api/index.js, so ../build/server/index.js resolves correctly
-import * as build from "../build/server/index.js";
+import { join } from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+// Enterprise-grade absolute path resolution for Vercel serverless functions
+// Vercel's bundling can affect relative path resolution, so we use absolute paths
+// Get the directory of this file (api/index.js)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// Resolve build/server/index.js relative to project root
+// api/index.js is at root/api/index.js, so we go up one level to root, then into build/server
+const buildPath = join(__dirname, "..", "build", "server", "index.js");
+// Dynamic import with absolute path to avoid Vercel bundling path resolution issues
+const build = await import(buildPath);
 
 const handleRequest = createRequestHandler({
   build,

@@ -7,6 +7,9 @@ import type { Config } from "@react-router/dev/config";
  */
 export default {
   // Explicitly configure server build
+  // serverBuildFile is relative to build output directory (build/)
+  // So "server/index.js" means build/server/index.js
+  // DO NOT use path.join or absolute paths - React Router handles this internally
   serverBuildFile: "server/index.js",
   
   // Configure for serverless deployment (Vercel)
