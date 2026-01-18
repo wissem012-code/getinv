@@ -1,5 +1,4 @@
 import type { LoaderFunctionArgs } from "react-router";
-import prisma from "../db.server";
 
 /**
  * GET /api/health/database
@@ -61,6 +60,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   diagnostics.database.configured = true;
+
+  // Dynamically import Prisma to avoid module-level failures
+  let prisma;
+  try {
+    const dbModule = await import("../db.server");
+    prisma = dbModule.default;
+  } catch (importError) {
+    diagnostics.database.connection = "error";
+    diagnostics.database.error = `Failed to initialize Prisma: ${importError instanceof Error ? importError.message : String(importError)}`;
+    diagnostics.recommendations.push({
+      issue: "Prisma initialization failed",
+      fix: "Check DATABASE_URL format. It should be: postgresql://user:password@host:port/database",
+    });
+    return jsonResponse({ healthy: false, ...diagnostics }, { status: 503 });
+  }
 
   // Try to connect to the database
   try {
