@@ -7,13 +7,8 @@
  */
 
 import { createRequestHandler } from "@react-router/node";
-// Import from build/server - this should be available at runtime
-// With outputDirectory: "build/client", only build/client/ is deployed for static files
-// But serverless functions (api/) are deployed separately from root
-// build/server/ needs to be accessible - it's copied to build/client/server/ during build
-// At runtime, build/client/ is the static root, so server/ inside it is accessible
-// But api/index.js runs in a different context (serverless function root)
-// So we import from build/server which should be preserved
+// Import from build/server - path is relative to api/index.js at root
+// From api/ directory, ../build/server/index.js resolves to build/server/index.js at project root
 import * as build from "../build/server/index.js";
 
 const handleRequest = createRequestHandler({
