@@ -13,14 +13,17 @@ function jsonResponse(data: unknown, init: ResponseInit = {}) {
 // --------------------
 // Env helpers
 // --------------------
-function mustEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`Server misconfigured: ${name} missing`);
-  return v;
+function getEnv(name: string): string | undefined {
+  return process.env[name];
 }
 
-const SUPABASE_URL = () => mustEnv("SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY = () => mustEnv("SUPABASE_SERVICE_ROLE_KEY");
+function getSupabaseUrl(): string | undefined {
+  return getEnv("SUPABASE_URL");
+}
+
+function getSupabaseServiceRoleKey(): string | undefined {
+  return getEnv("SUPABASE_SERVICE_ROLE_KEY");
+}
 
 // --------------------
 // GET /api/sync/health
@@ -28,10 +31,13 @@ const SUPABASE_SERVICE_ROLE_KEY = () => mustEnv("SUPABASE_SERVICE_ROLE_KEY");
 // Does not require Shopify authentication
 // --------------------
 export async function loader({ request }: LoaderFunctionArgs) {
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseServiceRoleKey = getSupabaseServiceRoleKey();
+
   const diagnostics: {
     timestamp: string;
     supabase: {
-      url: string;
+      url: string | null;
       configured: boolean;
       connection: "ok" | "error" | "not_tested";
       error?: string;
@@ -52,13 +58,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     };
     environment: {
       nodeEnv: string;
+      hasSupabaseUrl: boolean;
       hasServiceRoleKey: boolean;
     };
   } = {
     timestamp: new Date().toISOString(),
     supabase: {
-      url: SUPABASE_URL(),
-      configured: true,
+      url: supabaseUrl ?? null,
+      configured: !!(supabaseUrl && supabaseServiceRoleKey),
       connection: "not_tested",
     },
     schema: {
@@ -74,13 +81,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
     },
     environment: {
       nodeEnv: process.env.NODE_ENV || "unknown",
-      hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceRoleKey: !!supabaseServiceRoleKey,
     },
   };
 
+  // Early return if not configured
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    diagnostics.supabase.connection = "error";
+    diagnostics.supabase.error = `Missing environment variables: ${!supabaseUrl ? "SUPABASE_URL" : ""}${!supabaseUrl && !supabaseServiceRoleKey ? ", " : ""}${!supabaseServiceRoleKey ? "SUPABASE_SERVICE_ROLE_KEY" : ""}`;
+    
+    return jsonResponse(
+      {
+        healthy: false,
+        ...diagnostics,
+        recommendations: [
+          {
+            issue: "Missing configuration",
+            fix: "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables in Vercel",
+          },
+        ],
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     // Test Supabase connection
-    const supabase = createClient(SUPABASE_URL(), SUPABASE_SERVICE_ROLE_KEY(), {
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: { persistSession: false },
     });
 

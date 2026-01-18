@@ -53,7 +53,7 @@ optional_scopes = [
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "https://utrprngboxriryrgetkp.supabase.co/functions/v1/shopify-oauth/callback" ]
+redirect_urls = [ "https://getinv.vercel.app/auth/callback" ]
 
 [pos]
 embedded = false
